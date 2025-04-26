@@ -1,0 +1,40 @@
+{
+  "manifest_version": 3,
+  "name": "Bridge",
+  "version": "1.0",
+  "description": "Context-aware productivity tool for legal workflows",
+  "permissions": ["tabs", "scripting", "activeTab", "storage"],
+  "host_permissions": ["file:///*", "http://localhost/*", "https://*/*"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "css": ["bridge-ui.css"],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ],
+  "action": {
+    "default_icon": {
+      "16": "images/bridge-toolbar.png",
+      "32": "images/bridge-toolbar.png",
+      "48": "images/bridge-toolbar.png",
+      "128": "images/bridge-toolbar.png"
+    }
+  },
+  "icons": {
+    "16": "images/bridge-toolbar.png",
+    "32": "images/bridge-toolbar.png",
+    "48": "images/bridge-toolbar.png",
+    "128": "images/bridge-toolbar.png"
+  },
+  "web_accessible_resources": [
+  {
+    "resources": ["images/icon.png"],
+    "matches": ["<all_urls>"]
+  }
+]
+}

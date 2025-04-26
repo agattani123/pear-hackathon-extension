@@ -9,6 +9,31 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 dotenv.config({ path: path.resolve(__dirname, "../.env") });
+
+// const scrollAppsScriptUrls = {};
+// if (process.env.SCROLL_APPS_SCRIPT_URLS) {
+//   process.env.SCROLL_APPS_SCRIPT_URLS.split(',').forEach(entry => {
+//     const [tab, url] = entry.split(':');
+//     if (tab && url) scrollAppsScriptUrls[tab.trim()] = url.trim();
+//   });
+// }
+
+// const referenceDocumentTitles = {};
+// if (process.env.REFERENCE_DOCUMENT_TITLES) {
+//   process.env.REFERENCE_DOCUMENT_TITLES.split(',').forEach(entry => {
+//     const [tab, title] = entry.split(':');
+//     if (tab && title) referenceDocumentTitles[title.trim()] = tab.trim();
+//   });
+// }
+
+const hardcodedAppsScriptUrls = {
+  "Tab2": "https://script.google.com/macros/s/AKfycbwxe9JHSpiMwSn4s9_MFMs9jxbjK_E4TKMjQqKdTlS3Pkvbb5ROC1ZdQIQOdilretPJvw/exec",
+  "Tab3": "https://script.google.com/macros/s/AKfycbwOHdZcWKHhFBNZykvpfRX2R3IURQMRSVB2USNkFr5-xZ6QVYHWunyREPvpWjWsE9dlyw/exec",
+  "Tab4": "https://script.google.com/macros/s/AKfycbyaKeAJTEUA-n1UWGE37mcLGizgsZgUDrTJP3K8i20KfvwQQJAuciXuiBBYa1zwIj7_PA/exec",
+  "Tab5": "https://script.google.com/macros/s/AKfycbzHy6RkAYFcjd1-KWQ9pLOINo9M-r2k2qVUfr3VIvff0HglcucR6CwN_xzDtlngW4U/exec"
+};
+
+
 const app = express();
 app.use(express.json());
 
@@ -42,9 +67,14 @@ let lastFingerprint = "";
 let lastMatchedFingerprint = "";
 
 function getTitleForDoc(docId) {
-  const index = REFERENCE_DOC_IDS.indexOf(docId);
-  return REFERENCE_DOC_TITLES[index] || docId;
+  const index = REFERENCE_DOC_IDS.findIndex(id => id.trim() === docId.trim());
+  if (index !== -1 && index < REFERENCE_DOC_TITLES.length) {
+    return REFERENCE_DOC_TITLES[index].trim();
+  }
+  console.warn(`[Mapping] No title found for docId: ${docId}`);
+  return null;
 }
+
 
 function getTextFromElement(element) {
   return element?.textRun?.content || "";
@@ -73,6 +103,7 @@ async function triggerLLMMatch(paragraphText) {
   for (const docId of REFERENCE_DOC_IDS) {
     const referenceBody = await getDocText(docId);
     const referenceText = referenceBody.map(block => block.paragraph ? extractParagraphText(block.paragraph) : "").join("\n");
+    const referenceParas = referenceBody.filter(b => b.paragraph).map(b => extractParagraphText(b.paragraph));
 
     const llmRes = await fetch("http://localhost:3000/analyze-match", {
       method: "POST",
@@ -91,66 +122,27 @@ async function triggerLLMMatch(paragraphText) {
     }
 
     const matchType = llmJson["Type of match found"];
-    const matchedClause = llmJson["Reference Clause"];
+    let matchedClause = llmJson["Reference Clause"];
     const note = llmJson["Note"];
 
+    if (matchedClause) {
+      matchedClause = matchedClause
+        .replace(/\\n/g, "\n")
+        .replace(/\\"/g, '"')
+        .replace(/\\u201c|\\u201d/g, '"')
+        .replace(/\s+/g, ' ')
+        .trim();
+    }
 
-
-    if (matchType !== "Partial Match" || !matchedClause) {
-      console.warn(`[LLM][${docId}] No valid match found.`);
-    
-      // Clear highlights in this doc
-      await docs.documents.batchUpdate({
-        auth: oauth2Client,
-        documentId: docId,
-        requestBody: {
-          requests: [
-            {
-              updateTextStyle: {
-                range: { startIndex: 1, endIndex: referenceText.length + 1 },
-                textStyle: { backgroundColor: null },
-                fields: "backgroundColor",
-              },
-            },
-          ],
-        },
-      });
-    
-      // Log "No match" with appropriate message
-      const now = new Date();
-      const timestamp = now.toLocaleString("en-US", { /* formatting */ });
-    
-      const noMatchEntry =
-        `Timestamp: ${timestamp}\nReference Document: ${docId}\n\n` +
-        `User Clause:\n${paragraphText}\n\n` +
-        `Match Status: No Match\n` +
-        `Reference Clause:\nNone\n\n` +
-        `Note:\nNo matching Clause found.\n\n` +
-        `====================\n\n`;
-    
-      await docs.documents.batchUpdate({
-        auth: oauth2Client,
-        documentId: LOG_DOC_ID,
-        requestBody: [
-          {
-            insertText: {
-              location: { index: 1 },
-              text: noMatchEntry
-            }
-          }
-        ]
-      });
-    
-      // Store null match in app.locals so background.js can access it
+    if (matchType === "No Match" || !matchedClause || matchedClause === "N/A") {
+      console.warn(`[LLM][${docId}] No valid match found, skipping highlight.`);
       if (!app.locals.docNotes) app.locals.docNotes = {};
       app.locals.docNotes[docId] = {
         match: null,
-        note: "No matching Clause found."
+        note: note || "No matching Clause found."
       };
-    
       continue;
     }
-    
 
     if (!app.locals.docNotes) app.locals.docNotes = {};
     app.locals.docNotes[docId] = {
@@ -158,10 +150,31 @@ async function triggerLLMMatch(paragraphText) {
       note: note || null
     };
 
-    const startIndex = referenceText.indexOf(matchedClause);
-    const endIndex = startIndex + matchedClause.length;
+    let startIndex = referenceText.indexOf(matchedClause);
+    let endIndex = startIndex + matchedClause.length;
+
+    // 🔥 Fallback if exact match fails
     if (startIndex === -1 || endIndex === -1) {
-      console.warn(`[LLM][${docId}] Could not find clause in flat referenceText.`);
+      console.warn(`[LLM][${docId}] Could not find exact clause. Falling back to paragraph match.`);
+      const cleanClause = matchedClause.toLowerCase().replace(/\s+/g, ' ').trim();
+      let foundPara = null;
+
+      for (const para of referenceParas) {
+        const cleanPara = para.toLowerCase().replace(/\s+/g, ' ').trim();
+        if (cleanPara.includes(cleanClause.slice(0, 20))) {  // 20 character sniff
+          foundPara = para;
+          break;
+        }
+      }
+
+      if (foundPara) {
+        startIndex = referenceText.indexOf(foundPara);
+        endIndex = startIndex + foundPara.length;
+      }
+    }
+
+    if (startIndex === -1 || endIndex === -1) {
+      console.error(`[LLM][${docId}] Still could not find anything. Skipping highlight.`);
       continue;
     }
 
@@ -183,9 +196,7 @@ async function triggerLLMMatch(paragraphText) {
             updateTextStyle: {
               range: { startIndex, endIndex },
               textStyle: {
-                backgroundColor: {
-                  color: { rgbColor: { red: 1, green: 1, blue: 0 } },
-                },
+                backgroundColor: { color: { rgbColor: { red: 1, green: 1, blue: 0 } } },
               },
               fields: "backgroundColor",
             },
@@ -195,17 +206,7 @@ async function triggerLLMMatch(paragraphText) {
     });
 
     const now = new Date();
-    const timestamp = now.toLocaleString("en-US", {
-      timeZone: "America/Los_Angeles",
-      weekday: "short",
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-      hour12: true
-    });
+    const timestamp = now.toLocaleString("en-US", { timeZone: "America/Los_Angeles" });
 
     const logEntry =
       `Timestamp: ${timestamp}\nReference Document: ${getTitleForDoc(docId)}\n\n` +
@@ -219,22 +220,29 @@ async function triggerLLMMatch(paragraphText) {
       auth: oauth2Client,
       documentId: LOG_DOC_ID,
       requestBody: {
-        requests: [
-          {
-            insertText: {
-              location: { index: 1 },
-              text: logEntry
-            }
-          }
-        ]
+        requests: [{ insertText: { location: { index: 1 }, text: logEntry } }],
       },
     });
 
-    await fetch("https://script.google.com/macros/s/AKfycbyR1Fk7k_DKpP01H_2KEEIoNfNuinZ5beu1qYK8GmMCbA0JiMneigJXXdTF68yWUSE/exec", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: matchedClause })
-    });
+    const referenceTitle = getTitleForDoc(docId);
+    // const tabName = referenceDocumentTitles[referenceTitle];
+
+    // if (tabName && scrollAppsScriptUrls[tabName]) {
+    //   const targetScriptUrl = scrollAppsScriptUrls[tabName];
+    const targetScriptUrl = hardcodedAppsScriptUrls[referenceTitle];
+
+    if (targetScriptUrl) {
+      console.log(`📡 Sending matched clause to ${referenceTitle} (${targetScriptUrl})`);
+      
+      await fetch(targetScriptUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: matchedClause })
+      });
+    } else {
+      console.warn(`⚠️ No Apps Script URL found for Reference Title: ${referenceTitle}`);
+    }
+
   }
 
   lastMatchedFingerprint = paragraphText;

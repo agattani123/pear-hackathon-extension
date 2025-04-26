@@ -75,7 +75,7 @@ async function getSelectedTextFromDocs(webAppUrl) {
 }
 
 // Example usage:
-const webAppURL = "https://script.google.com/macros/s/AKfycbyTgze09GMInVIL0p8RATPTYaN4MIL_j-WRAIAPmcXEDy1JkyCA9q-I6Znu82I8D1snBg/exec";
+const webAppURL = "https://script.google.com/macros/s/AKfycbwwUhqjSN4vSKo5Lbnz3IfaUb5mWRH53tOmI4RwA7fKg9wn1VjX0R0IFipbU5ep7Y7w8Q/exec";
 getSelectedTextFromDocs(webAppURL);
 
 chrome.runtime.onMessage.addListener((msg) => {

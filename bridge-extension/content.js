@@ -1,18 +1,13 @@
 // == Google Docs Selection Listener + Text Extractor == //
 
-console.log("📄 [Bridge] content.js loaded");
-console.log("🧠 [Bridge] Window location:", window.location.href);
-
+console.log("[Bridge] content.js loaded");
 
 // Detect mouseup and try to get selected lines
 document.addEventListener("mouseup", () => {
-  console.log("🖱️ [Bridge] Mouse released – checking selection...");
-
   const selectedLines = getSelectedLineText();
   if (selectedLines.length > 0) {
-    console.log("✅ [Bridge] Selected line(s):", selectedLines);
   } else {
-    console.log("⚠️ [Bridge] No matching selected lines found.");
+    console.log("[Bridge] No matching selected lines found.");
   }
 });
 
@@ -62,14 +57,13 @@ async function getSelectedTextFromDocs(webAppUrl) {
     const data = await response.text();
 
     if (response.ok) {
-      console.log("✅ [Bridge] Selected Text from Docs API:", data);
       return data;
     } else {
-      console.error("❌ [Bridge] Failed to fetch selected text:", response.status, data);
+      console.error("[Bridge] Failed to fetch selected text:", response.status, data);
       return null;
     }
   } catch (error) {
-    console.error("❌ [Bridge] Network error:", error);
+    console.error("[Bridge] Network error:", error);
     return null;
   }
 }
@@ -79,7 +73,7 @@ const webAppURL = "https://script.google.com/macros/s/AKfycbwwUhqjSN4vSKo5Lbnz3I
 getSelectedTextFromDocs(webAppURL);
 
 chrome.runtime.onMessage.addListener((msg) => {
-  console.log("📬 [Bridge] Received runtime message:", msg);  // ← ADD THIS LINE
+  console.log("[Bridge] Received runtime message:", msg); 
   if (msg.type === "showNote" && msg.note) {
     displayNoteOnSide(msg.note);
   }
@@ -87,7 +81,7 @@ chrome.runtime.onMessage.addListener((msg) => {
 
 
 function displayNoteOnSide(noteText) {
-  console.log("📝 [Bridge] Displaying note:", noteText);
+  console.log("[Bridge] Displaying note:", noteText);
 
   const oldNote = document.getElementById("bridge-note-box");
   if (oldNote) oldNote.remove();

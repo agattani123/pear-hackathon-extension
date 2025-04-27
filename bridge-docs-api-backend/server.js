@@ -232,7 +232,7 @@ async function triggerLLMMatch(paragraphText) {
     const targetScriptUrl = hardcodedAppsScriptUrls[referenceTitle];
 
     if (targetScriptUrl) {
-      console.log(`📡 Sending matched clause to ${referenceTitle} (${targetScriptUrl})`);
+      console.log(`Sending matched clause to ${referenceTitle} (${targetScriptUrl})`);
       
       await fetch(targetScriptUrl, {
         method: "POST",
@@ -240,7 +240,7 @@ async function triggerLLMMatch(paragraphText) {
         body: JSON.stringify({ text: matchedClause })
       });
     } else {
-      console.warn(`⚠️ No Apps Script URL found for Reference Title: ${referenceTitle}`);
+      console.warn(`No Apps Script URL found for Reference Title: ${referenceTitle}`);
     }
 
   }

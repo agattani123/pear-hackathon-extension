@@ -10,7 +10,7 @@ chrome.tabs.onActivated.addListener(async ({ tabId }) => {
   const tab = await chrome.tabs.get(tabId);
   const url = tab.url;
   if (!url) return;
-  console.log("🔄 [Bridge] Switched tab to:", url);
+  console.log("[Bridge] Switched tab to:", url);
 
   if (url.startsWith("file://") && !fileCache[url]) {
     try {
@@ -19,9 +19,9 @@ chrome.tabs.onActivated.addListener(async ({ tabId }) => {
         func: () => document.body.innerText
       });
       fileCache[url] = content;
-      console.log("📄 [Bridge] Cached file:", url);
+      console.log("[Bridge] Cached file:", url);
     } catch (err) {
-      console.warn("⚠️ [Bridge] Error reading static file:", err.message);
+      console.warn("[Bridge] Error reading static file:", err.message);
     }
   }
 
@@ -62,7 +62,7 @@ const match = url.match(/\/document\/d\/([a-zA-Z0-9-_]+)/);
 const docId = match ? match[1] : null;
 
 if (!docId) {
-  console.warn("⚠️ [Bridge] Could not extract docId from URL:", url);
+  console.warn("[Bridge] Could not extract docId from URL:", url);
   return;
 }
 
@@ -78,9 +78,6 @@ fetch("http://localhost:4000/match-docs", {
   chrome.tabs.query({}, tabs => {
     for (const tab of tabs) {
       if (tab.url.includes(docId)) {
-        console.log("HELLLLL YEAHHH");
-        console.log(docId);
-        console.log(note);
         if (note) {
           chrome.tabs.sendMessage(tab.id, {
             type: "showNote",

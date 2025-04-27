@@ -15,9 +15,9 @@
           google.script.run.withSuccessHandler((stored) => {
             if (stored && stored.length > 3) {
               const scrollTarget = shortenToFirstNCharacters(stored, 20); // slice right before search
-              console.log("🎯 [Sidebar] Scrolling to:", scrollTarget);
+              console.log("[Sidebar] Scrolling to:", scrollTarget);
               google.script.run.withSuccessHandler((msg) => {
-                console.log("📍", msg);
+                console.log(msg);
               }).scrollToWordInDoc(scrollTarget);
             }
           }).getMatchText();

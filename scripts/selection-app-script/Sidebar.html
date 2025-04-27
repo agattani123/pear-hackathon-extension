@@ -1,0 +1,59 @@
+<head>
+  <base target="_top">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      font-size: 1px;
+      margin: 8px;
+      padding: 0;
+      width: 1px;         /* 🔽 Smaller width */
+      overflow-wrap: break-word;
+      color: transparent;
+    }
+    p {
+      margin-top: 10px;
+    }
+  </style>
+  <script>
+    let lastStableSelection = "";
+    let lastCheckTime = Date.now();
+
+    function sendSelectionToBridge(text) {
+      console.log("[Sidebar] Sending selection to Bridge /select-text:", text);
+
+      fetch("http://localhost:4000/select-text", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ selectedText: text })
+      })
+      .then(res => res.text())
+      .then(msg => {
+        console.log("[Bridge] Response from /select-text:", msg);
+      })
+      .catch(err => {
+        console.error("[Sidebar] Error sending to /select-text:", err);
+      });
+    }
+
+    function fetchSelection() {
+      google.script.run.withSuccessHandler(function (text) {
+        const cleaned = text.trim();
+        if (cleaned.length < 3 || cleaned === lastStableSelection) return;
+
+        if (Date.now() - lastCheckTime >= 1000) {
+          lastStableSelection = cleaned;
+          sendSelectionToBridge(cleaned);
+        } else {
+          lastCheckTime = Date.now();
+        }
+      }).getSelectedText();
+    }
+
+    setInterval(fetchSelection, 300);
+  </script>
+</head>
+<body>
+  <p><b>Bridge is watching your selection...</b></p>
+</body>

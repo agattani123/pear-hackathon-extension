@@ -1,9 +1,9 @@
 # Bridge: Productivity Chrome Extension with Context-Driven Document Navigation
 
 This project integrates:
-- A **Chrome extension** for context-aware tab switching and text highlighting
-- A **Google Docs fetcher** using the Docs API
-- A **Local LLM server** that evaluates relevance between the Google Doc and reference HTML tabs
+- A Chrome extension for context-aware tab switching and text highlighting
+- A Google Docs backend using the Docs API
+- A local LLM server that evaluates relevance between the Google Doc and reference documents
 
 ---
 
@@ -15,24 +15,25 @@ bridge-full/
 │   ├── manifest.json
 │   ├── background.js
 │   ├── content.js
+│   ├── bridge-ui.css
 │
 ├── bridge-docs-api-backend/
 │   ├── auth.js
-│   ├── bridge-google-docs.js
-|   ├── fetch-doc-text.js
+│   ├── server.js
 │   ├── .env
-│   └── package.json
+│   ├── package.json
 │
 ├── bridge-llm-matcher/
 │   ├── server.js
 │   ├── .env
+│   ├── package.json
 ```
 
 ---
 
 ## Initial Setup (only needed once)
 
-### 1. Clone the repo
+### 1. Clone the repository
 
 ```bash
 git clone https://github.com/agattani123/bridge-full.git
@@ -41,7 +42,7 @@ cd bridge-full
 
 ---
 
-## Start the LLM Server (OpenAI)
+## Start the LLM Matcher
 
 ### Path: `bridge-llm-matcher/`
 
@@ -56,17 +57,17 @@ Create `.env` inside `bridge-llm-matcher/`:
 OPENAI_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ```
 
-Start the LLM server:
+Start the server:
 
 ```bash
 node server.js
 ```
 
-LLM matcher will now run at: `http://localhost:3000`
+The LLM matcher will now run at `http://localhost:3000`.
 
 ---
 
-## Start Google Docs Fetcher
+## Start the Google Docs Backend
 
 ### Path: `bridge-docs-api-backend/`
 
@@ -78,34 +79,41 @@ npm install
 Create `.env` inside `bridge-docs-api-backend/`:
 
 ```
-CLIENT_ID=your-client-id-from-google
-CLIENT_SECRET=your-client-secret-from-google
+CLIENT_ID=your-google-client-id
+CLIENT_SECRET=your-google-client-secret
 REDIRECT_URI=http://localhost
 ACCESS_TOKEN=
+DOCUMENT_ID=your-draft-google-doc-id
+REFERENCE_DOCUMENT_IDS=comma,separated,reference,doc,ids
+LOG_DOC_ID=your-log-google-doc-id
 ```
 
-### 1. Run OAuth to get access token:
+### 1. Authenticate Google API access
 
 ```bash
 node auth.js
 ```
 
 - Open the printed URL in your browser
-- Grant access to your Google Docs
-- Paste the code shown in the redirect back into the terminal
-- Copy the resulting `✅ Access Token:` into your `.env` under `ACCESS_TOKEN=...`
+- Grant access to Google Docs
+- Paste the authorization code back into the terminal
+- Copy the printed access token into `.env` under `ACCESS_TOKEN=...`
 
-### 2. Run Google Docs scraper:
+### 2. Start the backend server
 
 ```bash
-node bridge-google-docs.js
+node server.js
 ```
 
-Google Docs API listener will run and log extracted text on changes.
+The backend will now:
+- Poll the draft document for edits
+- Listen for text selections
+- Match against reference documents
+- Highlight and scroll the matches inside the respective Google Docs
 
 ---
 
-## Load Chrome Extension
+## Load the Chrome Extension
 
 ### Path: `bridge-extension/`
 
@@ -113,62 +121,68 @@ Google Docs API listener will run and log extracted text on changes.
 cd ../bridge-extension
 ```
 
-1. Visit `chrome://extensions/` in Google Chrome
-2. Turn on **Developer Mode**
-3. Click **Load unpacked** and select the `bridge-extension/` folder
+1. Go to `chrome://extensions/` in Google Chrome
+2. Turn on Developer Mode
+3. Click Load Unpacked and select the `bridge-extension/` folder
 
-The extension is now live.
-
----
-
-## Testing the Full Pipeline
-
-1. Open a [Google Docs](https://docs.google.com/) document whose ID is configured in `bridge-google-docs.js`
-2. Open any reference HTML files via `file:///...` in separate Chrome tabs
-3. Begin typing or editing the Google Doc
-
-✔️ **Every change to the Google Doc is sent to the LLM**
-✔️ **LLM response will be logged in DevTools Console**
-✔️ **On tab switch to a file:// page, the most relevant sentence will be highlighted**
+The extension will now be active.
 
 ---
 
-## Full Command List (No Skips)
+## Testing the Full System
+
+1. Open the Google Doc configured as the Draft document
+2. Open each Google Doc corresponding to Tab2, Tab3, Tab4, and Tab5
+3. Begin typing or selecting text inside the Draft document
+
+On each edit or selection:
+- The paragraph will be sent to the LLM server
+- The best matching reference paragraph will be highlighted
+- If a matching Apps Script sidebar is installed, the document will automatically scroll to the relevant clause
+- Notes, if available, will be shown in the active document
+
+---
+
+## Full Command Summary
 
 ```bash
-# Clone the repo
+# Clone the repository
 git clone https://github.com/agattani123/bridge-full.git
 cd bridge-full
 
-# 1. Run LLM Matcher
+# 1. Start the LLM server
 cd bridge-llm-matcher
 npm install
 echo "OPENAI_API_KEY=sk-..." > .env
 node server.js
 
-# 2. Run Google Docs API Backend
+# 2. Start the Google Docs backend
 cd ../bridge-docs-api-backend
 npm install
-echo "CLIENT_ID=..."
-echo "CLIENT_SECRET=..."
-echo "REDIRECT_URI=http://localhost"
-echo "ACCESS_TOKEN=" > .env
-node auth.js  # Paste code, copy token into .env
-node fetch-doc-text.js
+echo "CLIENT_ID=..." > .env
+echo "CLIENT_SECRET=..." >> .env
+echo "REDIRECT_URI=http://localhost" >> .env
+echo "ACCESS_TOKEN=" >> .env
+echo "DOCUMENT_ID=..." >> .env
+echo "REFERENCE_DOCUMENT_IDS=..." >> .env
+echo "LOG_DOC_ID=..." >> .env
+node auth.js
+node server.js
 
-# 3. Load Chrome Extension
+# 3. Load the Chrome Extension
 cd ../bridge-extension
-# then load this folder in chrome://extensions
+# Load this folder in chrome://extensions
 ```
 
 ---
 
 ## Notes
 
-- `node_modules/` are not checked into Git; you must run `npm install` manually in each subfolder
-- All credentials go in `.env` files - you (hopefully lol) will not see them hard-coded
-- Make sure **Chrome is your default browser** for the injection to work as intended
-- The extension **does not re-fetch static HTML** on every tab switch — only once per file
+- Each subfolder requires `npm install` separately
+- No `node_modules/` folders are committed to Git
+- All credentials must be stored inside `.env` files
+- Chrome must be the browser used to authenticate OAuth
+- HTML files opened via `file:///` are indexed only once on first switch
 
 ---
 

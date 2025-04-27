@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <script>
+      let wasHidden = false;
+
+      function shortenToFirstNCharacters(text, n = 20) {
+        if (!text) return "";
+        return text.slice(0, n).trim(); // no formatting, just take first 20 chars raw
+      }
+
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible" && wasHidden) {
+          google.script.run.withSuccessHandler((stored) => {
+            if (stored && stored.length > 3) {
+              const scrollTarget = shortenToFirstNCharacters(stored, 20); // slice right before search
+              console.log("🎯 [Sidebar] Scrolling to:", scrollTarget);
+              google.script.run.withSuccessHandler((msg) => {
+                console.log("📍", msg);
+              }).scrollToWordInDoc(scrollTarget);
+            }
+          }).getMatchText();
+        }
+        wasHidden = document.visibilityState === "hidden";
+      });
+    </script>
+  </head>
+  <body>
+    <p><b>Bridge auto-scroll (first 20 characters mode only).</b></p>
+  </body>
+</html>
